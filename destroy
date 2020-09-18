@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Text output colors
+TXT_RED='\033[0;31m'
+TXT_YELLOW='\033[1;33m'
+TXT_GREEN='\033[0;32m'
+TXT_NOCOLOR='\033[0m'
+
+# Verify that AWS credentials are present
+if [[ ! -f ~/.aws/credentials ]] 
+then
+    echo -e "${TXT_RED}ERROR:${TXT_NOCOLOR} AWS credentials are not present."
+    echo -e "Please run the ${TXT_YELLOW}aws configure${TXT_NOCOLOR} command before running this script again."
+    exit 1
+fi
+
+# Verify that AWS configuration settings are present
+if [[ ! -f ~/.aws/config ]] 
+then
+    echo -e "${TXT_RED}ERROR:${TXT_NOCOLOR} AWS configuration settings are not present."
+    echo -e "Please run the ${TXT_YELLOW}aws configure${TXT_NOCOLOR} command before running this script again."
+    exit 1
+fi
+
+read -p 'Development Environment: ' dev_env
+stack_name="zid-web-${dev_env}"
+key_name="${stack_name}-ec2-key"
+
+# Delete the CloudFormation stack
+aws cloudformation delete-stack --stack-name $stack_name
+
+if [[ $? -ne 0 ]] 
+then
+    echo -e "${TXT_RED}Error deleting CloudFormation stack.${TXT_NOCOLOR}"
+    exit 1
+else
+    echo -e "${TXT_GREEN}CloudFormation stack deleted successfully.${TXT_NOCOLOR}"
+fi
+
+# Delete the EC2 key pair
+aws ec2 delete-key-pair --key-name $key_name
+
+if [[ $? -ne 0 ]] 
+then
+    echo -e "${TXT_RED}Error deleting EC2 key pair.${TXT_NOCOLOR}"
+    exit 1
+else
+    echo -e "${TXT_GREEN}Key pair deleted successfully.${TXT_NOCOLOR}"
+    chmod 777 ec2-private-key-${dev_env}.pem
+    rm ec2-private-key-${dev_env}.pem
+    exit 0
+fi
