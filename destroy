@@ -37,6 +37,10 @@ else
     echo -e "${TXT_GREEN}CloudFormation stack deleted successfully.${TXT_NOCOLOR}"
 fi
 
+# Delete SSM parameters
+chmod +x params/delete-parameters
+./params/delete-parameters
+
 # Delete the EC2 key pair
 aws ec2 delete-key-pair --key-name $key_name
 
