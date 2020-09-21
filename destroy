@@ -46,7 +46,7 @@ then
     exit 1
 else
     echo -e "${TXT_GREEN}Key pair deleted successfully.${TXT_NOCOLOR}"
-    chmod 777 ec2-private-key-${dev_env}.pem
-    rm ec2-private-key-${dev_env}.pem
+    chmod 777 ${stack_name}-ec2-key.pem
+    rm ${stack_name}-ec2-key.pem
     exit 0
 fi

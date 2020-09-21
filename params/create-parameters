@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Get development environment
+read -p 'Development Environment: ' dev_env
+
+# Write parameters to AWS Parameter Store
+aws ssm put-parameter \
+  --name /zid-web/db_name \
+  --type String \
+  --value "zid-db-${dev_env}" \
+  --description "Database name" \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /zid-web/master_username \
+  --type String \
+  --value "zid_user" \
+  --description "Database master username" \
+  --overwrite
+
+# DO NOT commit an actual password to version control!
+# Use a placeholder such as INSERT_PASSWORD
+aws ssm put-parameter \
+  --name /zid-web/master_password \
+  --type SecureString \
+  --value "INSERT_PASSWORD" \
+  --description "Database master password" \
+  --overwrite

@@ -26,13 +26,17 @@ read -p 'Development Environment: ' dev_env
 stack_name="zid-web-${dev_env}"
 key_name="${stack_name}-ec2-key"
 
+# Insert values into AWS Parameter Store
+chmod +x params/create-parameters
+./params/create-parameters
+
 # Create EC2 key pair
-aws ec2 create-key-pair --key-name ${key_name} --query 'KeyMaterial' --output text > ec2-private-key-${dev_env}.pem
+aws ec2 create-key-pair --key-name ${key_name} --query 'KeyMaterial' --output text > ${stack_name}-ec2-key.pem
 
 if [[ $? -ne 0 ]] 
 then
     echo -e "${TXT_RED}Error creating EC2 key pair.${TXT_NOCOLOR}"
-    rm ec2-private-key-${dev_env}.pem
+    rm ${stack_name}-ec2-key.pem
     exit 1
 else
     echo -e "${TXT_GREEN}EC2 key pair successfully created.${TXT_NOCOLOR}"
@@ -45,10 +49,10 @@ if [[ $? -ne 0 ]]
 then
     echo -e "${TXT_RED}Error creating CloudFormation stack.${TXT_NOCOLOR}"
     aws ec2 delete-key-pair --key-name ${key_name}
-    rm ec2-private-key-${dev_env}.pem
+    rm ${stack_name}-ec2-key.pem
     exit 1
 else
     echo -e "${TXT_GREEN}Success! CloudFormation stack provisioning complete.${TXT_NOCOLOR}"
-    chmod 400 ec2-private-key-${dev_env}.pem
+    chmod 400 ${stack_name}-ec2-key.pem
     exit 0
 fi

@@ -1,0 +1,4 @@
+#!/bin/bash
+aws ssm delete-parameter --name /zid-web/db_name
+aws ssm delete-parameter --name /zid-web/master_username
+aws ssm delete-parameter --name /zid-web/master_password
