@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ZID web server specifications CloudFormation template
+
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment in which to deploy/update/destroy infrastructure (dev/prod)
+    AllowedValues:
+      - dev
+      - prod
+  ##############################################
+  # AWS Infrastructure
+  ##############################################
+  ZidIamInstanceProfile:
+    Type: String
+    Description: ARN for the IAM role to be assigned to server instances
+  
+  PublicSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: ID for the public security group where instances should be deployed
+
+  ZidVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID for the VPC in which the ASG/ALB should be deployed
+
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of public subnet IDs in which the auto-scaling group will deploy instances
+
+  ##############################################
+  # Deployment Information
+  ##############################################
+  InstanceUserData:
+    Type: String
+    Description: User data for newly created instances
+
+  InstanceType:
+    Type: String
+    Description: EC2 instance type for newly created instances
+
+  InstanceImageId:
+    Type: AWS::EC2::Image::Id
+    Description: AMI ID for newly created instances
+
+  HealthCheckPath:
+    Type: String
+    Description: ELB health check path. Should be a link to a static file (e.g. image)
+
+
+Conditions:
+  EnvIsProd: !Equals
+    - !Ref Environment
+    - prod
+  
+
+Resources:
+  ZidWebLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref InstanceImageId
+      AssociatePublicIpAddress: !If [EnvIsProd, false, true]
+      IamInstanceProfile: !Ref ZidIamInstanceProfile
+      KeyName: !Sub zid-${Environment}
+      LaunchConfigurationName: !Sub ${AWS::StackName}-launch-config
+      PlacementTenancy: default
+      SecurityGroups: 
+        - !Ref PublicSecurityGroupId
+      UserData: 
+        Fn::Base64: !Ref InstanceUserData
+
+  ZidTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AWS::StackName}-targetgroup
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      VpcId: !Ref ZidVpcId
+
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 4
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200
+
+  ZidAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-asg
+      VPCZoneIdentifier: !Ref PublicSubnetIds
+      LaunchConfigurationName: !Ref ZidWebLaunchConfig
+      MinSize: 1
+      MaxSize: !If [EnvIsProd, 5, 2]
+      DesiredCapacity: !If [EnvIsProd, 2, 1]
+      HealthCheckGracePeriod: 300
+      HealthCheckType: ELB
+      Cooldown: 300
+      TargetGroupARNs: 
+        - !Ref ZidTargetGroup
+
+  ZidLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${AWS::StackName}-alb
+      IpAddressType: ipv4
+      SecurityGroups: 
+        - !Ref PublicSecurityGroupId
+      Scheme: internet-facing
+      Subnets: !Ref PublicSubnetIds
+      Type: application
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ZidLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Order: 10
+          Type: forward
+          TargetGroupArn: !Ref ZidTargetGroup

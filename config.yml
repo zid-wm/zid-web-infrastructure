@@ -1,0 +1,64 @@
+zid-net-dev-b:
+    properties: &net-dev-properties
+        aws_region: us-east-1
+        type: net
+    inputs: &net-dev-inputs
+        Environment: dev
+        DBName: zid_artcc
+        DBUsername: zid_user
+        DBInstanceType: db.t3.micro
+        DBInitialStorage: 20
+        DBMaxStorage: 100
+
+zid-net-dev-g:
+    properties: *net-dev-properties
+    inputs: *net-dev-inputs
+
+zid-web-dev-b:
+    properties: &web-dev-properties
+        aws_region: us-east-1
+        type: web
+    inputs: &web-dev-inputs
+        Environment: dev
+
+        # Outputs from networking CloudFormation stack
+        ZidVpcId: vpc-0639c0ade1db5e456
+        PublicSecurityGroupId: sg-0ff1d363f235ecc12
+        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-g-role-us-east-1
+        PublicSubnetIds: subnet-084cb98bca058ea59, subnet-0314b8353e169d0c3, subnet-00d503c2bed7fe276
+
+        InstanceImageId: ami-0885b1f6bd170450c  # Ubuntu 20.04 LTS AMI
+        InstanceType: t3.micro
+        HealthCheckPath: /static/img/indy_ext.png  # Should be a link to a static file such as an image
+        InstanceUserData: |
+            #!/bin/bash
+            sudo apt update
+
+            sudo apt install -y apache2 apache2-dev libapache2-mod-wsgi-py3 python3-pip python3-venv awscli
+            sudo pip3 install virtualenv
+
+            cd /home/ubuntu
+            git clone https://github.com/zid-wm/zid-web.git
+            cd /home/ubuntu/zid-web
+
+            git checkout dev
+            python3 -m venv env
+            source env/bin/activate
+            pip3 install -r requirements.txt
+            sudo aws s3 cp s3://zid-dev/ec2_data/.env /home/ubuntu/zid-web/.env
+            python3 manage.py makemigrations
+            python3 manage.py migrate
+            deactivate
+
+            sudo rm /etc/apache2/sites-available/000-default.conf
+            sudo aws s3 cp s3://zid-dev/ec2_data/000-default.conf /etc/apache2/sites-available/000-default.conf
+            sudo service apache2 restart
+
+zid-web-dev-g:
+    properties: *web-dev-properties
+    inputs: *web-dev-inputs
+        # Outputs from networking CloudFormation stack
+        ZidVpcId: vpc-0639c0ade1db5e456
+        PublicSecurityGroupId: sg-0ff1d363f235ecc12
+        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-g-role-us-east-1
+        PublicSubnetIds: subnet-084cb98bca058ea59, subnet-0314b8353e169d0c3, subnet-00d503c2bed7fe276

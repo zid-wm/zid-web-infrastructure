@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ZID networking infrastructure CloudFormation template
+
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment in which to deploy/update/destroy infrastructure (dev/prod). Necessary for database settings.
+    AllowedValues:
+      - dev
+      - prod
+  DBUsername:
+    Type: String
+    Description: Username for master ZID database
+    MinLength: 1
+    MaxLength: 16
+    ConstraintDescription: Must contain 1-16 characters.
+  DBPassword:
+    Type: String
+    Description: Password for master ZID database
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    ConstraintDescription: Must contain 8-41 characters.
+  DBName:
+    Type: String
+    Description: Name for master ZID database
+    MinLength: 1
+    MaxLength: 16
+    ConstraintDescription: Must contain 1-16 characters.
+  DBInstanceType:
+    Type: String
+    Description: Instance type for ZID database
+  DBInitialStorage:
+    Type: Number
+    Description: Initial size (in GB) of ZID database. Must be at least 20 GB.
+    MinValue: 20
+    MaxValue: 65536
+  DBMaxStorage:
+    Type: Number
+    Description: Maximum size (in GB) which the ZID database can be scaled to. Must be equal to or greater than DBInitialStorage.
+    MinValue: 20
+    MaxValue: 65536
+
+
+Conditions:
+  EnvIsProd: !Equals
+    - !Ref Environment
+    - prod
+
+
+Resources:
+  ZidWebVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.233.0.0/16"
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-vpc
+
+  ##############################################
+  # Internet Gateway
+  ##############################################
+  ZidInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: ZidWebVPC
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-igw
+
+  ZidGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref ZidWebVPC
+      InternetGatewayId: !Ref ZidInternetGateway
+
+  ##############################################
+  # Subnets
+  ##############################################
+  ZidPublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      CidrBlock: "10.233.1.0/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-a
+
+  ZidPublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:  !Select [ 1, !GetAZs ]
+      CidrBlock: "10.233.1.32/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-b
+
+  ZidPublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:  !Select [ 2, !GetAZs ]
+      CidrBlock: "10.233.1.64/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-c
+
+  ZidPrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      CidrBlock: "10.233.2.0/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-a
+
+  ZidPrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:  !Select [ 1, !GetAZs ]
+      CidrBlock: "10.233.2.32/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-b
+
+  ZidPrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:  !Select [ 2, !GetAZs ]
+      CidrBlock: "10.233.2.64/27"
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-c
+            
+  ##############################################
+  # Routing Tables
+  ##############################################
+  ZidPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: ZidGatewayAttachment
+    Properties:
+      RouteTableId: !Ref ZidPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref ZidInternetGateway
+
+  ZidPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ZidWebVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-rt
+    
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref ZidPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref ZidNatGateway
+
+  ##############################################
+  # Route Table Associations
+  ##############################################
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPublicRouteTable
+      SubnetId: !Ref ZidPublicSubnetA
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPublicRouteTable
+      SubnetId: !Ref ZidPublicSubnetB
+
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPublicRouteTable
+      SubnetId: !Ref ZidPublicSubnetC
+
+  PrivateSubnetARouteTableAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPrivateRouteTable
+      SubnetId: !Ref ZidPrivateSubnetA
+
+  PrivateSubnetBRouteTableAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPrivateRouteTable
+      SubnetId: !Ref ZidPrivateSubnetB
+
+  PrivateSubnetCRouteTableAssocation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ZidPrivateRouteTable
+      SubnetId: !Ref ZidPrivateSubnetC
+  
+  ##############################################
+  # NAT Gateways
+  ##############################################
+  ZidNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatElasticIp.AllocationId
+      SubnetId: !Ref ZidPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-nat-gateway-a
+  
+  NatElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  ##############################################
+  # Security Groups
+  ##############################################
+  ZidPublicSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-public-sg
+      GroupDescription: !Sub Security group for public ${AWS::StackName} instances
+      VpcId: !Ref ZidWebVPC
+      SecurityGroupIngress:
+        - Description: HTTP
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - Description: HTTPS
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+
+  ZidPrivateSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-private-sg
+      GroupDescription: !Sub Security group for private ${AWS::StackName} instances
+      VpcId: !Ref ZidWebVPC
+      SecurityGroupIngress:
+        - Description: PostgreSQL
+          SourceSecurityGroupId: !Ref ZidPublicSg
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+
+  ##############################################
+  # IAM
+  ##############################################
+  ZidWebIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-role-${AWS::Region}
+      Description: Allows EC2 instances to access S3 buckets.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: allow-s3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: "*"
+    
+  ZidInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${AWS::StackName}-role-${AWS::Region}
+      Path: /
+      Roles:
+        - !Ref ZidWebIamRole
+      
+
+  ##############################################
+  # Database
+  ##############################################
+  ZidDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${AWS::StackName}-db-subnetgroup
+      DBSubnetGroupDescription: Subnet group for ZID database instance(s).
+      SubnetIds:
+        - !Ref ZidPrivateSubnetA
+        - !Ref ZidPrivateSubnetB
+        - !Ref ZidPrivateSubnetC
+
+  ZidDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      EngineVersion: 12.4
+
+      DBName: !Ref DBName
+      DBInstanceIdentifier: !Sub ${AWS::StackName}-db
+      DBInstanceClass: !Ref DBInstanceType
+      DBSubnetGroupName: !Ref ZidDbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref ZidPrivateSg
+
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      Port: 5432
+
+      AllocatedStorage: !Ref DBInitialStorage
+      MaxAllocatedStorage: !Ref DBMaxStorage
+      BackupRetentionPeriod: !If [EnvIsProd, 7, 0]  # Days
+      AllowMajorVersionUpgrade: true
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: !If [EnvIsProd, true, false]
+      MultiAZ: !If [EnvIsProd, true, false]
+      PubliclyAccessible: false
+      StorageType: gp2
+
+
+Outputs:
+  ServerIamProfileArn:
+    Description: ARN for the IAM instance profile to be associated with newly created instances
+    Value: !GetAtt [ZidInstanceProfile, Arn]
+
+  PublicSecurityGroupId:
+    Description: ID of the public security group created for ZID web server instances
+    Value: !GetAtt [ZidPublicSg, GroupId]
+
+  ZidVpcId:
+    Description: ID of the VPC created for ZID infrastructure
+    Value: !Ref ZidWebVPC
+
+  PublicSubnetIds:
+    Description: List of IDs for public ZID subnets
+    Value: !Join [", ", [
+      !Ref ZidPublicSubnetA,
+      !Ref ZidPublicSubnetB,
+      !Ref ZidPublicSubnetC
+    ]]
+
+  DatabaseEndpointAddress:
+    Description: Host address for the ZID database instance
+    Value: !GetAtt [ZidDatabase, Endpoint.Address]

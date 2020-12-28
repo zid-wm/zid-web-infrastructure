@@ -1,16 +1,21 @@
 # vZID Web Infrastructure
-This repository contains descriptor files for AWS backend services configured for the vZID ARTCC website. Also included are bash files to assist in deploying stacks from a local machine.
+This repository contains files necessary to deploy ZID networking and server infrastructure via AWS CloudFormation.
 
 ## AWS CloudFormation
 These infrastructure files are written using AWS CloudFormation template formats (written in YAML). Information about the CloudFormation syntax and its features can be found [here](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html).
 
-## Deploying Stacks from Local Machine
-_Note: Unless otherwise specified, all commands are run from the root project directory._
-1. Ensure you have the [AWS CLI](https://aws.amazon.com/cli/) installed on your local machine. Before using the AWS CLI for the first time, you must add your credentials and configuration settings by running `aws configure`.
-2. The automated `create` and `destroy` scripts are written for Bash (and similar) terminals. If you are using Windows, I recommend downloading one of many free versions of Bash available. Otherwise, you will have to find documentation on deploying CloudFormation stacks manually.
-3. Ensure the automated scripts are executable by running:
+## Things to Note
+- Ensure you have the [AWS CLI](https://aws.amazon.com/cli/) installed on your local machine. Before using the AWS CLI for the first time, you must add your credentials and configuration settings by running `aws configure`.
+- Before running the script for the first time, ensure you have the required Python packages by running `python3 -m pip install -r requirements.txt`.
+- The `infra` script found in the root directory will take care of provisioning, updating, and destroying CloudFormation stacks for you. 
+    - Networking stacks should rarely need updated or re-provisioned; a new networking stack will include a new (blank) database and could cause any current data to be irreversibly lost. 
+- The `config.yml` file should be updated with values found in the networking CloudFormation stack prior to deploying any web stack. These values are used to deploy stacks in the proper accounts and locations.
+
+## Tooling Usage Guide
+To use the script in this repository, run the following command in the terminal:
+```bash
+./infra {provision,update,destroy} <stack name> [--config-file FILE_PATH]
 ```
-chmod +x create destroy
-```
-4. To deploy a new stack, run `./create`. You will be prompted for a development environment. If the script is successful, a file will be created in the project directory containing the RSA private key for connecting to the created EC2 instance. **Do not commit this file to any version control.**
-5. To destroy an old stack, run `./destroy`. You will be prompted for a development environment. Ensure that the development environment you provide is the same as you used for provisioning the new stack. Your file containing the RSA private key for the given environment will be deleted.
+The first argument should be one of `provision`, `update`, or `destroy`. If updating an existing web stack, ensure the AWS networking settings in `config.yml` do not change from the existing stack.
+
+`<stack-name>` must match the name of a top-level entry in the `config.yml` file. If you have changed the name of the configuration file or it is located in a different directory than the root, you must specify the relative or absolute path by using the `--config-file` flag.
