@@ -1,2 +1,2 @@
-# Ignore ec2 private key file
-ec2-private-key-*.pem
+# Python virtual environment file
+env/
