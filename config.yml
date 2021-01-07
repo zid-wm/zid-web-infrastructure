@@ -6,7 +6,7 @@ zid-net-dev-b:
         Environment: dev
         DBName: zid_artcc
         DBUsername: zid_user
-        DBInstanceType: db.t3.micro
+        DBInstanceType: db.t2.micro
         DBInitialStorage: 20
         DBMaxStorage: 100
 
@@ -22,13 +22,13 @@ zid-web-dev-b:
         Environment: dev
 
         # Outputs from networking CloudFormation stack
-        ZidVpcId: vpc-0639c0ade1db5e456
-        PublicSecurityGroupId: sg-0ff1d363f235ecc12
-        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-g-role-us-east-1
-        PublicSubnetIds: subnet-084cb98bca058ea59, subnet-0314b8353e169d0c3, subnet-00d503c2bed7fe276
+        ZidVpcId: vpc-0b00b26e5d56c5f27
+        PublicSecurityGroupId: sg-0805957357b218e06
+        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-b-role-us-east-1
+        PublicSubnetIds: subnet-0f42956049f7337a2, subnet-0d8d2b83e88bb00eb, subnet-061bd84768e476902
 
         InstanceImageId: ami-0885b1f6bd170450c  # Ubuntu 20.04 LTS AMI
-        InstanceType: t3.micro
+        InstanceType: t2.micro
         HealthCheckPath: /static/img/indy_ext.png  # Should be a link to a static file such as an image
         InstanceUserData: |
             #!/bin/bash
@@ -56,9 +56,10 @@ zid-web-dev-b:
 
 zid-web-dev-g:
     properties: *web-dev-properties
-    inputs: *web-dev-inputs
+    inputs: 
+        <<: *web-dev-inputs
         # Outputs from networking CloudFormation stack
-        ZidVpcId: vpc-0639c0ade1db5e456
-        PublicSecurityGroupId: sg-0ff1d363f235ecc12
-        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-g-role-us-east-1
-        PublicSubnetIds: subnet-084cb98bca058ea59, subnet-0314b8353e169d0c3, subnet-00d503c2bed7fe276
+        ZidVpcId: vpc-0b00b26e5d56c5f27
+        PublicSecurityGroupId: sg-0805957357b218e06
+        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-b-role-us-east-1
+        PublicSubnetIds: subnet-0f42956049f7337a2, subnet-0d8d2b83e88bb00eb, subnet-061bd84768e476902
