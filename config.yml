@@ -2,10 +2,13 @@ zid-net-dev-b:
     properties: &net-dev-properties
         aws_region: us-east-1
         type: net
+
+        # Parameter Store paths
+        DBName: /zid/dev/db/database
+        DBUsername: /zid/dev/db/username
+        DBPassword: /zid/dev/db/password
     inputs: &net-dev-inputs
         Environment: dev
-        DBName: zid_artcc
-        DBUsername: zid_user
         DBInstanceType: db.t2.micro
         DBInitialStorage: 20
         DBMaxStorage: 100
@@ -63,3 +66,73 @@ zid-web-dev-g:
         PublicSecurityGroupId: sg-0805957357b218e06
         ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-b-role-us-east-1
         PublicSubnetIds: subnet-0f42956049f7337a2, subnet-0d8d2b83e88bb00eb, subnet-061bd84768e476902
+
+zid-net-prod-b:
+    properties: &net-prod-properties
+        aws_region: us-east-1
+        type: net
+
+        # Parameter Store paths
+        DBName: /zid/prod/db/database
+        DBUsername: /zid/prod/db/username
+        DBPassword: /zid/prod/db/password
+    inputs: &net-prod-inputs
+        Environment: prod
+        DBName: zid_artcc
+        DBUsername: zid_user
+        DBInstanceType: db.t3.micro
+        DBInitialStorage: 20
+        DBMaxStorage: 1000
+
+zid-net-prod-g:
+    properties: *net-prod-properties
+    inputs: *net-prod-inputs
+    
+zid-web-prod-b:
+    properties: &web-prod-properties
+        aws_region: us-east-1
+        type: web
+    inputs: &web-prod-inputs
+        Environment: prod
+
+        # Outputs from networking CloudFormation stack
+        ZidVpcId: PLACEHOLDER
+        PublicSecurityGroupId: PLACEHOLDER
+        ZidIamInstanceProfile: PLACEHOLDER
+        PublicSubnetIds: PLACEHOLDER
+
+        InstanceImageId: ami-0885b1f6bd170450c  # Ubuntu 20.04 LTS AMI
+        InstanceType: t3.micro
+        HealthCheckPath: /static/img/indy_ext.png  # Should be a link to a static file such as an image
+        InstanceUserData: |
+            #!/bin/bash
+            sudo apt update
+
+            sudo apt install -y apache2 apache2-dev libapache2-mod-wsgi-py3 python3-pip python3-venv awscli
+            sudo pip3 install virtualenv
+
+            cd /home/ubuntu
+            git clone https://github.com/zid-wm/zid-web.git
+            cd /home/ubuntu/zid-web
+
+            python3 -m venv env
+            source env/bin/activate
+            pip3 install -r requirements.txt
+            sudo aws s3 cp s3://zid-prod/ec2_data/.env /home/ubuntu/zid-web/.env
+            python3 manage.py makemigrations
+            python3 manage.py migrate
+            deactivate
+
+            sudo rm /etc/apache2/sites-available/000-default.conf
+            sudo aws s3 cp s3://zid-prod/ec2_data/000-default.conf /etc/apache2/sites-available/000-default.conf
+            sudo service apache2 restart
+
+zid-web-dev-g:
+    properties: *web-dev-properties
+    inputs: 
+        <<: *web-dev-inputs
+        # Outputs from networking CloudFormation stack
+        ZidVpcId: PLACEHOLDER
+        PublicSecurityGroupId: PLACEHOLDER
+        ZidIamInstanceProfile: PLACEHOLDER
+        PublicSubnetIds: PLACEHOLDER

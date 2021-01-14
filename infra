@@ -32,6 +32,32 @@ def load_config(args):
         return yaml.safe_load(config_file)[args.stack_name]
 
 
+def get_db_params(config, parameters):
+    ssm = boto3.client('ssm')
+
+    parameters.append({
+        'ParameterKey': 'DBName',
+        'ParameterValue': ssm.get_parameter(
+            Name=config['properties']['DBName']
+        )['Parameter']['Value']
+    })
+    parameters.append({
+        'ParameterKey': 'DBUsername',
+        'ParameterValue': ssm.get_parameter(
+            Name=config['properties']['DBUsername']
+        )['Parameter']['Value']
+    })
+    parameters.append({
+        'ParameterKey': 'DBPassword',
+        'ParameterValue': ssm.get_parameter(
+            Name=config['properties']['DBPassword'],
+            WithDecryption=True
+        )['Parameter']['Value']
+    })
+
+    return parameters
+
+
 def create_parameters(config, is_net):
     parameters = []
     for key, value in config['inputs'].items():
@@ -40,10 +66,7 @@ def create_parameters(config, is_net):
             'ParameterValue': str(value)
         })
     if is_net:
-        parameters.append({
-            'ParameterKey': 'DBPassword',
-            'ParameterValue': input('Enter master database password: ')
-        })
+        parameters = get_db_params(config, parameters)
     return parameters
 
 
