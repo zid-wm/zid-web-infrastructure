@@ -28,6 +28,10 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Description: List of public subnet IDs in which the auto-scaling group will deploy instances
 
+  InternalHostedZoneId:
+    Type: String
+    Description: Hosted zone ID for zid-internal.com hosted zone.
+
   ##############################################
   # Deployment Information
   ##############################################
@@ -126,3 +130,8 @@ Resources:
         - Order: 10
           Type: forward
           TargetGroupArn: !Ref ZidTargetGroup
+
+Outputs:
+  LoadBalancerDns:
+    Description: DNS Name of the ZID web load balancer (for Route 53 records)
+    Value: !GetAtt [ZidLoadBalancer, DNSName]

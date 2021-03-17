@@ -25,10 +25,10 @@ zid-web-dev-b:
         Environment: dev
 
         # Outputs from networking CloudFormation stack
-        ZidVpcId: vpc-0b00b26e5d56c5f27
-        PublicSecurityGroupId: sg-0805957357b218e06
-        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-b-role-us-east-1
-        PublicSubnetIds: subnet-0f42956049f7337a2, subnet-0d8d2b83e88bb00eb, subnet-061bd84768e476902
+        ZidVpcId: vpc-0880532738751252f
+        PublicSecurityGroupId: sg-099c271cb2f2c2530
+        ZidIamInstanceProfile: arn:aws:iam::618725536201:instance-profile/zid-net-dev-g-role-us-east-1
+        PublicSubnetIds: subnet-0cb1ed1de4d4200cf, subnet-0a7239a53e9b7df97, subnet-07d7e9e8de6fb9556
 
         InstanceImageId: ami-0885b1f6bd170450c  # Ubuntu 20.04 LTS AMI
         InstanceType: t2.micro
